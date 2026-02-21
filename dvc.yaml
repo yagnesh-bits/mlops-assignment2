@@ -1,0 +1,59 @@
+stages:
+
+  # ── Stage 1: Preprocess raw data ──────────────────────────────────────────
+  preprocess:
+    cmd: python scripts/run_preprocess.py
+    deps:
+      - data/raw
+      - src/data/preprocess.py
+      - scripts/run_preprocess.py
+    params:
+      - params.yaml:
+          - data.train_ratio
+          - data.val_ratio
+          - data.seed
+    outs:
+      - data/processed
+
+  # ── Stage 2: Train model ───────────────────────────────────────────────────
+  train:
+    cmd: >
+      python -m src.models.train
+        --data_dir data/processed
+        --output_dir models/artifacts
+        --model_type ${model.type}
+        --epochs ${model.epochs}
+        --batch_size ${model.batch_size}
+        --lr ${model.lr}
+        --mlflow_uri ${mlflow.uri}
+    deps:
+      - data/processed
+      - src/models/model.py
+      - src/models/train.py
+      - src/data/preprocess.py
+    params:
+      - params.yaml:
+          - model.type
+          - model.epochs
+          - model.batch_size
+          - model.lr
+          - mlflow.uri
+    outs:
+      - models/artifacts/best_model.pt
+    metrics:
+      - models/artifacts/metrics.json:
+          cache: false
+
+  # ── Stage 3: Evaluate on test set ─────────────────────────────────────────
+  evaluate:
+    cmd: python scripts/evaluate.py
+    deps:
+      - data/processed
+      - models/artifacts/best_model.pt
+      - src/models/model.py
+      - src/data/preprocess.py
+    outs:
+      - models/artifacts/classification_report.txt:
+          cache: false
+      - models/artifacts/confusion_matrix.png:
+          cache: false

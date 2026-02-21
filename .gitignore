@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+
+# Data (tracked by DVC)
+data/raw/
+data/processed/
+
+# Models (tracked by DVC/MLflow)
+models/artifacts/*.pt
+models/artifacts/*.h5
+
+# MLflow
+mlflow/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/

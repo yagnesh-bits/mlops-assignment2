@@ -1,0 +1,13 @@
+data:
+  train_ratio: 0.8
+  val_ratio: 0.1
+  seed: 42
+
+model:
+  type: cnn          # cnn | mobilenet
+  epochs: 15
+  batch_size: 32
+  lr: 0.001
+
+mlflow:
+  uri: http://localhost:5000
