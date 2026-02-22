@@ -15,12 +15,13 @@ data/processed/
 *.zip
 
 # Models (tracked by DVC/MLflow)
-models/artifacts/*.pt
-models/artifacts/*.h5
+#models/artifacts/*.pt
+#models/artifacts/*.h5
 
 # MLflow
 mlflow/
 mlruns/
+mlartifacts/
 mlflow.db
 
 # Jupyter
