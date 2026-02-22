@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/YOUR_USERNAME/cats-dogs-classifier:latest
+          image: ghcr.io/yagnesh-bits/cats-dogs-classifier:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8000

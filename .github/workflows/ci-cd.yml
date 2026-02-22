@@ -110,67 +110,7 @@ jobs:
         run: echo "Image digest → ${{ steps.build.outputs.digest }}"
 
   # ────────────────────────────────────────────────────────────────────────────
-  # JOB 3: Deploy to Kind Cluster (CD)
-  # ────────────────────────────────────────────────────────────────────────────
-  kind-deploy:
-    name: ☸️  Deploy to Kind Cluster
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Kind
-        uses: helm/kind-action@v1
-        with:
-          cluster_name: mlops-cluster
-          wait: 30s
-
-      - name: Verify Kind cluster
-        run: |
-          kubectl cluster-info
-          kubectl get nodes
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Load image into Kind
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest --name mlops-cluster
-
-      - name: Create namespace
-        run: kubectl create namespace mlops --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Update image tag in deployment
-        run: |
-          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          sed -i "s|image: .*cats-dogs-classifier.*|image: $NEW_IMAGE|g" k8s/deployment.yaml
-          cat k8s/deployment.yaml
-
-      - name: Apply Kubernetes manifests
-        run: kubectl apply -f k8s/ -n mlops
-
-      - name: Wait for deployment rollout
-        run: |
-          kubectl rollout status deployment/cats-dogs-classifier -n mlops --timeout=300s
-          kubectl get pods -n mlops
-          kubectl get svc -n mlops
-
-      - name: Verify deployment
-        run: |
-          kubectl get all -n mlops
-          kubectl describe deployment cats-dogs-classifier -n mlops
-          kubectl get svc -n mlops
-
-  # ────────────────────────────────────────────────────────────────────────────
-  # JOB 4: Smoke Tests on Kind Cluster
+  # JOB 3: Smoke Tests on Kind Cluster
   # ────────────────────────────────────────────────────────────────────────────
   smoke-test:
     name: 💨 Smoke Tests on Kind
