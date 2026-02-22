@@ -118,8 +118,8 @@ class TestPreprocessPilImage:
 # ── Class Labels ──────────────────────────────────────────────────────────────
 
 def test_classes_order():
-    """CLASSES list should always be ['cat', 'dog']."""
-    assert CLASSES == ["cat", "dog"]
+    """CLASSES list should always be ['Cat', 'Dog']."""
+    assert CLASSES == ["Cat", "Dog"]
 
 def test_classes_length():
     assert len(CLASSES) == 2

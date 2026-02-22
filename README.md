@@ -45,14 +45,15 @@ cats-dogs-mlops/
 ```bash
 git clone <repo-url>
 cd cats-dogs-mlops
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+
+# Install dependencies with uv
+uv sync
 ```
 
 ### 2. Download Dataset (Kaggle)
 ```bash
-kaggle datasets download -d salader/dogs-vs-cats
-unzip dogs-vs-cats.zip -d data/raw/
+kaggle datasets download bhavikjikadara/dog-and-cat-classification-dataset
+unzip dog-and-cat-classification-dataset.zip -d data/raw/
 ```
 
 ### 3. Run DVC Pipeline (preprocess + train)

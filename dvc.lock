@@ -1,0 +1,96 @@
+schema: '2.0'
+stages:
+  preprocess:
+    cmd: python scripts/run_preprocess.py
+    deps:
+    - path: data/raw/PetImages
+      hash: md5
+      md5: 3a5cf86541f22c236620ce5b952ad684.dir
+      size: 848866410
+      nfiles: 24998
+    - path: scripts/run_preprocess.py
+      hash: md5
+      md5: c267b72da4d848241a2ed560a48067ba
+      size: 626
+    - path: src/data/preprocess.py
+      hash: md5
+      md5: e4dc706d5219aaf2cc1e92f14607a4f0
+      size: 11299
+    params:
+      params.yaml:
+        data.seed: 42
+        data.train_ratio: 0.8
+        data.val_ratio: 0.1
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 5f17eefe2ebdb47c22c342be0eb5c48a.dir
+      size: 848866410
+      nfiles: 24998
+  train:
+    cmd: python -m src.models.train --data_dir data/processed --output_dir 
+      models/artifacts --model_type cnn --epochs 15 --batch_size 32 --lr 0.001 
+      --mlflow_uri http://localhost:5000
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 5f17eefe2ebdb47c22c342be0eb5c48a.dir
+      size: 848866410
+      nfiles: 24998
+    - path: src/data/preprocess.py
+      hash: md5
+      md5: e4dc706d5219aaf2cc1e92f14607a4f0
+      size: 11299
+    - path: src/models/model.py
+      hash: md5
+      md5: 1dd815599b6a01d0a18da69bd09f4c27
+      size: 5300
+    - path: src/models/train.py
+      hash: md5
+      md5: a5fbfa187dad737da6ba822411856145
+      size: 9174
+    params:
+      params.yaml:
+        mlflow.uri: http://localhost:5000
+        model.batch_size: 32
+        model.epochs: 15
+        model.lr: 0.001
+        model.type: cnn
+    outs:
+    - path: models/artifacts/best_model.pt
+      hash: md5
+      md5: b08740f5e5f5c2b5ce4c4efdf0356060
+      size: 29889333
+    - path: models/artifacts/metrics.json
+      hash: md5
+      md5: 10596bb811d94da7a70307c6b813302a
+      size: 168
+  evaluate:
+    cmd: python scripts/evaluate.py
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 5f17eefe2ebdb47c22c342be0eb5c48a.dir
+      size: 848866410
+      nfiles: 24998
+    - path: models/artifacts/best_model.pt
+      hash: md5
+      md5: b08740f5e5f5c2b5ce4c4efdf0356060
+      size: 29889333
+    - path: src/data/preprocess.py
+      hash: md5
+      md5: e4dc706d5219aaf2cc1e92f14607a4f0
+      size: 11299
+    - path: src/models/model.py
+      hash: md5
+      md5: 1dd815599b6a01d0a18da69bd09f4c27
+      size: 5300
+    outs:
+    - path: models/artifacts/classification_report.txt
+      hash: md5
+      md5: e28b75a64d9b2e2750c4e8f4c84b6663
+      size: 326
+    - path: models/artifacts/confusion_matrix.png
+      hash: md5
+      md5: 3620a7487024c0f0a19add82621d7dd1
+      size: 22277

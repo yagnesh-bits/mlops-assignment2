@@ -10,11 +10,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from src.data.preprocess import get_dataloaders
 from src.models.model import load_model
 
-CLASSES = ["cat", "dog"]
+CLASSES = ["Cat", "Dog"]
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 _, _, test_loader = get_dataloaders("data/processed", batch_size=32)

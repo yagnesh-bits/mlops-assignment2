@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 IMAGE_SIZE = (224, 224)
 MEAN = [0.485, 0.456, 0.406]   # ImageNet stats
 STD  = [0.229, 0.224, 0.225]
-CLASSES = ["cat", "dog"]
+CLASSES = ["Cat", "Dog"]
 
 
 # ── Transforms ───────────────────────────────────────────────────────────────
@@ -118,6 +118,62 @@ def preprocess_pil_image(pil_image: Image.Image) -> torch.Tensor:
     return tensor.unsqueeze(0)
 
 
+def _detect_layout(raw_dir: Path) -> str:
+    """
+    Detect whether raw_dir uses flat (cat.0.jpg / dog.0.jpg) or
+    ImageFolder (cat/ dog/ sub-directories) layout.
+
+    Returns: "flat" | "imagefolder"
+    Raises:  ValueError if neither layout is detected.
+    """
+    # ImageFolder: at least one of the class sub-dirs exists and contains images
+    imagefolder_hits = sum(
+        1 for cls in CLASSES
+        if (raw_dir / cls).is_dir() and any((raw_dir / cls).glob("*.jpg"))
+    )
+    if imagefolder_hits > 0:
+        return "imagefolder"
+
+    # Flat: files named cat.*.jpg / dog.*.jpg in the root
+    flat_hits = sum(
+        1 for cls in CLASSES
+        if any(raw_dir.glob(f"{cls}.*.jpg"))
+    )
+    if flat_hits > 0:
+        return "flat"
+
+    raise ValueError(
+        f"No recognisable image layout found in '{raw_dir}'.\n"
+        f"Expected either:\n"
+        f"  Flat layout   : {raw_dir}/cat.0.jpg, {raw_dir}/dog.0.jpg, …\n"
+        f"  ImageFolder   : {raw_dir}/cat/*.jpg,  {raw_dir}/dog/*.jpg"
+    )
+
+
+def _collect_files_by_class(raw_dir: Path, layout: str) -> dict:
+    """
+    Return {{class_name: [Path, ...]}} for every class in CLASSES.
+
+    Supports both 'flat' and 'imagefolder' layouts.
+    """
+    files_by_class: dict = {}
+
+    if layout == "imagefolder":
+        for cls in CLASSES:
+            cls_dir = raw_dir / cls
+            found = sorted(cls_dir.glob("*.jpg")) + sorted(cls_dir.glob("*.jpeg")) + sorted(cls_dir.glob("*.png"))
+            files_by_class[cls] = found
+            logger.info(f"ImageFolder – {cls}: {len(found)} images")
+
+    else:  # flat
+        for cls in CLASSES:
+            found = sorted(raw_dir.glob(f"{cls}.*.jpg")) + sorted(raw_dir.glob(f"{cls}.*.jpeg")) + sorted(raw_dir.glob(f"{cls}.*.png"))
+            files_by_class[cls] = found
+            logger.info(f"Flat – {cls}: {len(found)} images")
+
+    return files_by_class
+
+
 def split_dataset(
     raw_dir: str,
     processed_dir: str,
@@ -126,57 +182,106 @@ def split_dataset(
     seed: int = 42,
 ) -> Tuple[int, int, int]:
     """
-    Split flat raw dataset into train/val/test sub-directories.
+    Split a raw dataset into train/val/test ImageFolder sub-directories.
+
+    Automatically detects the input layout:
+
+    **Flat layout** (Kaggle default)::
+
+        raw_dir/
+            cat.0.jpg
+            cat.1.jpg
+            dog.0.jpg
+            …
+
+    **ImageFolder layout**::
+
+        raw_dir/
+            cat/
+                image001.jpg
+                …
+            dog/
+                image001.jpg
+                …
+
+    In both cases the output is always written as ImageFolder::
+
+        processed_dir/
+            train/cat/*.jpg   train/dog/*.jpg
+            val/cat/*.jpg     val/dog/*.jpg
+            test/cat/*.jpg    test/dog/*.jpg
 
     Args:
-        raw_dir:       Directory containing cat.*.jpg / dog.*.jpg files.
-        processed_dir: Output directory for split data.
-        train_ratio:   Fraction for training.
-        val_ratio:     Fraction for validation.
-        seed:          Random seed.
+        raw_dir:       Source directory (flat or ImageFolder layout).
+        processed_dir: Destination directory for the split data.
+        train_ratio:   Fraction of data for training   (default 0.8).
+        val_ratio:     Fraction of data for validation (default 0.1).
+                       Test fraction = 1 - train_ratio - val_ratio.
+        seed:          Random seed for reproducibility.
 
     Returns:
-        Tuple of (n_train, n_val, n_test) counts.
+        Tuple of (n_train, n_val, n_test) total image counts.
+
+    Raises:
+        ValueError: If no images are found or ratios are invalid.
     """
+    if train_ratio + val_ratio >= 1.0:
+        raise ValueError(
+            f"train_ratio + val_ratio must be < 1.0, "
+            f"got {train_ratio} + {val_ratio} = {train_ratio + val_ratio}"
+        )
+
     np.random.seed(seed)
-    raw_dir = Path(raw_dir)
+    raw_dir       = Path(raw_dir)
     processed_dir = Path(processed_dir)
 
-    cat_files = sorted(raw_dir.glob("cat.*.jpg"))
-    dog_files = sorted(raw_dir.glob("dog.*.jpg"))
+    # ── Auto-detect input layout ──────────────────────────────────────────────
+    layout = _detect_layout(raw_dir)
+    logger.info(f"Detected layout: '{layout}' in '{raw_dir}'")
 
+    # ── Collect per-class file lists ──────────────────────────────────────────
+    files_by_class = _collect_files_by_class(raw_dir, layout)
+
+    empty_classes = [cls for cls, files in files_by_class.items() if len(files) == 0]
+    if empty_classes:
+        raise ValueError(f"No images found for class(es): {empty_classes} in '{raw_dir}'")
+
+    # ── Split each class independently (preserves class balance) ─────────────
     def _split(files):
-        n = len(files)
-        idx = np.random.permutation(n)
+        n       = len(files)
+        idx     = np.random.permutation(n)
         n_train = int(n * train_ratio)
         n_val   = int(n * val_ratio)
         return (
             [files[i] for i in idx[:n_train]],
-            [files[i] for i in idx[n_train:n_train + n_val]],
-            [files[i] for i in idx[n_train + n_val:]],
+            [files[i] for i in idx[n_train : n_train + n_val]],
+            [files[i] for i in idx[n_train + n_val :]],
         )
 
-    cat_train, cat_val, cat_test = _split(cat_files)
-    dog_train, dog_val, dog_test = _split(dog_files)
+    split_files: dict = {"train": [], "val": [], "test": []}
+    for cls, files in files_by_class.items():
+        tr, va, te = _split(files)
+        split_files["train"].append((cls, tr))
+        split_files["val"].append((cls, va))
+        split_files["test"].append((cls, te))
 
-    splits = {
-        "train": cat_train + dog_train,
-        "val":   cat_val   + dog_val,
-        "test":  cat_test  + dog_test,
-    }
+    # ── Copy files into ImageFolder output structure ──────────────────────────
+    for split_name, cls_file_pairs in split_files.items():
+        for cls, files in cls_file_pairs:
+            out_cls_dir = processed_dir / split_name / cls
+            out_cls_dir.mkdir(parents=True, exist_ok=True)
+            for src in files:
+                dst = out_cls_dir / src.name
+                shutil.copy2(src, dst)
 
-    for split_name, files in splits.items():
-        for cls in CLASSES:
-            (processed_dir / split_name / cls).mkdir(parents=True, exist_ok=True)
-        for src in files:
-            cls = "cat" if src.stem.startswith("cat") else "dog"
-            dst = processed_dir / split_name / cls / src.name
-            shutil.copy2(src, dst)
+    n_train = sum(len(f) for _, f in split_files["train"])
+    n_val   = sum(len(f) for _, f in split_files["val"])
+    n_test  = sum(len(f) for _, f in split_files["test"])
 
-    n_train = len(splits["train"])
-    n_val   = len(splits["val"])
-    n_test  = len(splits["test"])
-    logger.info(f"Split complete – train:{n_train} val:{n_val} test:{n_test}")
+    logger.info(
+        f"Split complete – train:{n_train}  val:{n_val}  test:{n_test}  "
+        f"(total:{n_train + n_val + n_test})"
+    )
     return n_train, n_val, n_test
 
 

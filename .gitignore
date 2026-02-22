@@ -12,6 +12,7 @@ venv/
 # Data (tracked by DVC)
 data/raw/
 data/processed/
+*.zip
 
 # Models (tracked by DVC/MLflow)
 models/artifacts/*.pt
@@ -19,6 +20,8 @@ models/artifacts/*.h5
 
 # MLflow
 mlflow/
+mlruns/
+mlflow.db
 
 # Jupyter
 .ipynb_checkpoints/

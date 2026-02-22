@@ -4,7 +4,7 @@ stages:
   preprocess:
     cmd: python scripts/run_preprocess.py
     deps:
-      - data/raw
+      - data/raw/PetImages
       - src/data/preprocess.py
       - scripts/run_preprocess.py
     params:
@@ -17,15 +17,15 @@ stages:
 
   # ── Stage 2: Train model ───────────────────────────────────────────────────
   train:
-    cmd: >
+    cmd: >-
       python -m src.models.train
-        --data_dir data/processed
-        --output_dir models/artifacts
-        --model_type ${model.type}
-        --epochs ${model.epochs}
-        --batch_size ${model.batch_size}
-        --lr ${model.lr}
-        --mlflow_uri ${mlflow.uri}
+      --data_dir data/processed
+      --output_dir models/artifacts
+      --model_type ${model.type}
+      --epochs ${model.epochs}
+      --batch_size ${model.batch_size}
+      --lr ${model.lr}
+      --mlflow_uri ${mlflow.uri}
     deps:
       - data/processed
       - src/models/model.py

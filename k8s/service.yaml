@@ -6,7 +6,7 @@ metadata:
   labels:
     app: cats-dogs-classifier
 spec:
-  type: LoadBalancer          # Use NodePort for minikube/kind
+  type: ClusterIP          # ClusterIP for Kind/Minikube, LoadBalancer for cloud
   selector:
     app: cats-dogs-classifier
   ports:

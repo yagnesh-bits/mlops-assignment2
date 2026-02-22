@@ -5,6 +5,7 @@ Run:  python -m src.models.train --model_type cnn --epochs 10
 """
 
 import argparse
+import json
 import logging
 import os
 import time
@@ -27,7 +28,7 @@ from src.models.model import build_model
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-CLASSES = ["cat", "dog"]
+CLASSES = ["Cat", "Dog"]
 
 
 # ── Training & Evaluation ─────────────────────────────────────────────────────
@@ -101,8 +102,16 @@ def plot_confusion_matrix(labels, preds, out_path):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main(args):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    logger.info(f"Using device: {device}")
+    # Detect device: CUDA (NVIDIA), ROCm (AMD), or CPU
+    if torch.cuda.is_available():
+        device = "cuda"
+        logger.info(f"Using device: {device} (NVIDIA GPU)")
+        logger.info(f"GPU Name: {torch.cuda.get_device_name(0)}")
+        logger.info(f"GPU Count: {torch.cuda.device_count()}")
+    else:
+        device = "cpu"
+        logger.info(f"Using device: {device}")
+        logger.info("No GPU detected. Training will be slow.")
 
     # Paths
     out_dir = Path(args.output_dir)
@@ -186,6 +195,17 @@ def main(args):
         logger.info(f"Test Accuracy: {test_acc:.4f}")
         mlflow.log_metric("test_accuracy", test_acc)
 
+        # Save metrics for DVC
+        metrics = {
+            "best_val_accuracy": float(best_val_acc),
+            "test_accuracy": float(test_acc),
+            "final_train_loss": float(train_losses[-1]),
+            "final_val_loss": float(val_losses[-1]),
+        }
+        metrics_path = out_dir / "metrics.json"
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f, indent=2)
+
         # Classification report
         report = classification_report(test_labels, test_preds, target_names=CLASSES)
         logger.info("\n" + report)
@@ -203,9 +223,16 @@ def main(args):
         mlflow.log_artifact(str(lc_path))
         mlflow.log_artifact(str(cm_path))
         mlflow.log_artifact(str(report_path))
+        mlflow.log_artifact(str(metrics_path))
 
-        # Log model
-        mlflow.pytorch.log_model(model, "model")
+        # Log model with pip requirements (handle ROCm version)
+        pip_requirements = [
+            f"torch=={torch.__version__.split('+')[0]}",  # Remove +rocm suffix
+            f"torchvision",
+            "pillow",
+            "numpy",
+        ]
+        mlflow.pytorch.log_model(model, "model", pip_requirements=pip_requirements)
 
         logger.info(f"Best val accuracy: {best_val_acc:.4f}")
         logger.info(f"Artifacts saved to: {out_dir}")
@@ -216,7 +243,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir",    default="data/processed", help="Processed data root")
     parser.add_argument("--output_dir",  default="models/artifacts", help="Output dir for model & plots")
     parser.add_argument("--model_type",  default="cnn", choices=["cnn", "mobilenet"])
-    parser.add_argument("--epochs",      type=int, default=15)
+    parser.add_argument("--epochs",      type=int, default=5)
     parser.add_argument("--batch_size",  type=int, default=32)
     parser.add_argument("--lr",          type=float, default=1e-3)
     parser.add_argument("--workers",     type=int, default=4)

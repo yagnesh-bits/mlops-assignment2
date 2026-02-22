@@ -2,14 +2,20 @@
 scripts/run_preprocess.py
 DVC stage: Split raw data into train/val/test.
 """
+import sys
 import yaml
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from src.data.preprocess import split_dataset
 
 params = yaml.safe_load(open("params.yaml"))["data"]
 
 n_train, n_val, n_test = split_dataset(
-    raw_dir="data/raw",
+    raw_dir="data/raw/PetImages",
     processed_dir="data/processed",
     train_ratio=params["train_ratio"],
     val_ratio=params["val_ratio"],
